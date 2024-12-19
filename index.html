@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,20 +11,20 @@
     <h1 class="text-center">Controlador de LEDs via BLE</h1>
     <div class="text-center mt-4">
       <button id="connectButton" class="btn btn-primary">Conectar ao ESP32</button>
+      <button id="disconnectButton" class="btn btn-danger" disabled>Desconectar</button>
     </div>
     <div class="mt-4 text-center">
-      <button id="led1On" class="btn btn-success m-2">LED 1 ON</button>
-      <button id="led1Off" class="btn btn-danger m-2">LED 1 OFF</button>
-    </div>
-    <div class="mt-4 text-center">
-      <button id="led2On" class="btn btn-success m-2">LED 2 ON</button>
-      <button id="led2Off" class="btn btn-danger m-2">LED 2 OFF</button>
+      <button id="led1Button" class="btn btn-success m-2" disabled>Acender LED 1</button>
+      <button id="led2Button" class="btn btn-success m-2" disabled>Acender LED 2</button>
     </div>
   </div>
   <script>
-    let device;
-    let characteristic;
+    let device = null;
+    let characteristic = null;
+    let led1State = false; // Estado inicial do LED 1
+    let led2State = false; // Estado inicial do LED 2
 
+    // Função para conectar ao ESP32
     document.getElementById('connectButton').addEventListener('click', async () => {
       try {
         device = await navigator.bluetooth.requestDevice({
@@ -34,27 +34,80 @@
         const server = await device.gatt.connect();
         const service = await server.getPrimaryService('12345678-1234-1234-1234-123456789abc');
         characteristic = await service.getCharacteristic('87654321-4321-4321-4321-cba987654321');
-        alert('Conectado ao ESP32!');
+        
+        // Ativar botões após conexão
+        document.getElementById('disconnectButton').disabled = false;
+        document.getElementById('led1Button').disabled = false;
+        document.getElementById('led2Button').disabled = false;
+        document.getElementById('connectButton').disabled = true;
+
+        console.log('Conectado ao ESP32!');
       } catch (error) {
-        console.error(error);
+        console.error('Erro ao conectar:', error);
         alert('Erro ao conectar ao ESP32!');
       }
     });
 
-    document.getElementById('led1On').addEventListener('click', () => sendCommand('LED1_ON'));
-    document.getElementById('led1Off').addEventListener('click', () => sendCommand('LED1_OFF'));
-    document.getElementById('led2On').addEventListener('click', () => sendCommand('LED2_ON'));
-    document.getElementById('led2Off').addEventListener('click', () => sendCommand('LED2_OFF'));
-
-    async function sendCommand(command) {
-      if (!characteristic) {
-        alert('Primeiro conecte ao ESP32!');
-        return;
+    // Função para alternar o estado do LED 1
+    document.getElementById('led1Button').addEventListener('click', async () => {
+      try {
+        if (!characteristic) return;
+        led1State = !led1State; // Alterna o estado do LED 1
+        const command = led1State ? 'LED1_ON' : 'LED1_OFF';
+        const encoder = new TextEncoder();
+        await characteristic.writeValue(encoder.encode(command));
+        document.getElementById('led1Button').textContent = led1State ? 'Desligar LED 1' : 'Acender LED 1';
+      } catch (error) {
+        console.error('Erro ao alternar LED 1:', error);
       }
-      const encoder = new TextEncoder();
-      await characteristic.writeValue(encoder.encode(command));
-      alert(`Comando enviado: ${command}`);
-    }
+    });
+
+    // Função para alternar o estado do LED 2
+    document.getElementById('led2Button').addEventListener('click', async () => {
+      try {
+        if (!characteristic) return;
+        led2State = !led2State; // Alterna o estado do LED 2
+        const command = led2State ? 'LED2_ON' : 'LED2_OFF';
+        const encoder = new TextEncoder();
+        await characteristic.writeValue(encoder.encode(command));
+        document.getElementById('led2Button').textContent = led2State ? 'Desligar LED 2' : 'Acender LED 2';
+      } catch (error) {
+        console.error('Erro ao alternar LED 2:', error);
+      }
+    });
+
+    // Função para desconectar do ESP32
+    document.getElementById('disconnectButton').addEventListener('click', async () => {
+      try {
+        if (device && device.gatt.connected) {
+          // Desligar LEDs antes de desconectar
+          const encoder = new TextEncoder();
+          if (characteristic) {
+            await characteristic.writeValue(encoder.encode('LED1_OFF'));
+            await characteristic.writeValue(encoder.encode('LED2_OFF'));
+          }
+
+          // Redefinir estados e textos
+          led1State = false;
+          led2State = false;
+          document.getElementById('led1Button').textContent = 'Acender LED 1';
+          document.getElementById('led2Button').textContent = 'Acender LED 2';
+
+          // Desconectar do dispositivo
+          await device.gatt.disconnect();
+          console.log('Desconectado do ESP32!');
+        }
+
+        // Desabilitar botões
+        document.getElementById('disconnectButton').disabled = true;
+        document.getElementById('led1Button').disabled = true;
+        document.getElementById('led2Button').disabled = true;
+        document.getElementById('connectButton').disabled = false;
+      } catch (error) {
+        console.error('Erro ao desconectar:', error);
+        alert('Erro ao desconectar do ESP32!');
+      }
+    });
   </script>
 </body>
 </html>
